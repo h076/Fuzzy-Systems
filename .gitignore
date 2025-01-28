@@ -1,0 +1,12 @@
+.mypy_cache
+.ropeproject
+ANFISdropout.py
+RuleGen.py
+main.py
+tempMANFIS.py
+RuleGeneration.py
+test.py
+pyrightconfig.json
+.DS_Store
+.idea
+__pycache__
