@@ -8,6 +8,8 @@ import torch
 from torch import optim
 from typing import Dict
 
+import NewRuleGen as rg
+
 """
 class inputLayer(nn.Module):
 
@@ -231,8 +233,38 @@ class MamdaniANFIS(nn.Module):
         self.output_range = output_range
         self.epsilon = 1e-5
 
+        self.rule_firing = []
+        self.rule_firing_indices = []
+
     def set_rule_base(self, rule_base):
         self.rule_base = rule_base
+
+    def explainPrediction(self, x_data: torch.Tensor, y_data: torch.Tensor):
+        predictions = self.forward(x_data)
+        for idx, p in enumerate(predictions):
+            print("predicted : {0}, True : {1}".format(p, y_data[idx]))
+            print("Rule firing ...")
+            significant_rules = {}
+            minimum_firing = 10000
+            print(len(self.rule_firing[idx]))
+            for i, r in enumerate(self.rule_firing[idx]):
+                if len(significant_rules) == 8:
+                    if minimum_firing < r:
+                        significant_rules.pop(minimum_firing)
+                        significant_rules[r] = i
+                        minimum_firing = min(significant_rules.keys())
+                else:
+                    significant_rules[r] = i
+                    minimum_firing = min(minimum_firing, r)
+
+            print("Significant rules : ")
+            #for firing, index in significant_rules.items():
+                #print("Rule {0} fired at : {1}".format(index, firing))
+                #rg.printRule(self.rule_base[self.rule_firing_indices[index]])
+            rules = []
+            for firing, index in significant_rules.items():
+                rules.append(self.rule_base[self.rule_firing_indices[index]])
+            rg.explainOutcome(rules, p)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch_size = x.shape[0]
@@ -247,6 +279,7 @@ class MamdaniANFIS(nn.Module):
         # Inference layer
         # Firing strengths generated using the product method
         rule_firing_strengths = []
+        firing_indices = []
         for rule_key, rule in self.rule_base.items():
             mf_indices = rule['antecedent']
             firing_strength = torch.ones(batch_size, device=x.device)
@@ -256,9 +289,12 @@ class MamdaniANFIS(nn.Module):
                     firing_strength *= current_membership  # Element-wise multiplication
 
             rule_firing_strengths.append(firing_strength)
+            firing_indices.append(mf_indices)
 
         # Stack all rule firing strengths into tensor of shape (batch_size, num_rules)
         rule_firing_strengths = torch.stack(rule_firing_strengths, dim=1)
+        self.rule_firing = rule_firing_strengths
+        self.rule_firing_indices = firing_indices
 
         # Implication layer
         # Assume a discrete universe of discourse for output

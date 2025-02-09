@@ -21,14 +21,15 @@ def generateIndependentFeaturePermutations(independent_features: List[int], numb
 def ruleGeneration(x_data, x_ranges, y_data, y_range, model, injection_rule_base):
     X = torch.tensor(x_data, dtype=torch.float32)
     y = torch.tensor(y_data, dtype=torch.float32)
-    num_epochs = 2
-    learning_rate = 0.02
-    batch_size = 10
+
+    num_epochs = 50
+    learning_rate = 0.025
+    batch_size = 32
 
     num_input_mfs = 5
     num_output_mfs = 5
 
-    minimum_rule_degree = 0.95
+    minimum_rule_degree = 0.60
 
     num_features = len(x_ranges)
 
@@ -59,7 +60,7 @@ def ruleGeneration(x_data, x_ranges, y_data, y_range, model, injection_rule_base
     # remove permutations based on feature dependencies
     # if a feature is independent then it should only be use in its own rule
     permutation_storage = []
-    independent_features = [2, 8]  # not zero indexed
+    independent_features = [7, 8, 10, 11]  # not zero indexed
     independent_feature_permutations = generateIndependentFeaturePermutations(independent_features, num_features)
     if independent_features:
         for perm in antecedent_permutations:
@@ -70,6 +71,8 @@ def ruleGeneration(x_data, x_ranges, y_data, y_range, model, injection_rule_base
                     break
             if valid_perm:
                 permutation_storage.append(perm)
+    else:
+        permutation_storage = antecedent_permutations
 
     permutation_storage = permutation_storage + independent_feature_permutations
 
@@ -77,7 +80,7 @@ def ruleGeneration(x_data, x_ranges, y_data, y_range, model, injection_rule_base
 
     # if two or more features are dependant then they should always be used together
     antecedent_permutations = []
-    dependant_feature_relations = [(1, 3)]  # not zero indexed
+    dependant_feature_relations = [(2, 3)]  # not zero indexed
     for perm in permutation_storage:
         valid_perm = True
         for relation in dependant_feature_relations:
@@ -144,8 +147,8 @@ def ruleGeneration(x_data, x_ranges, y_data, y_range, model, injection_rule_base
 
             # create the rule instance
             rule = {
-                'antecedent': antecedent_indexes,  # antecedant indexes
-                'consequent': consequent_index,  # consequent indexes
+                'antecedent': antecedent_indexes,  # antecedent indexes
+                'consequent': consequent_index,  # consequent index
                 'degree': rule_degree  # rule degree, can increase degree to make rule more predominant in the rule base
             }
 
@@ -179,7 +182,7 @@ def ruleGeneration(x_data, x_ranges, y_data, y_range, model, injection_rule_base
                         complement_rule_base[key] = inner_base
                     initial_rule_base[key] = rule
                 # add to complement rule base
-                elif rule_degree >= minimum_rule_degree:
+                elif rule_degree >= minimum_rule_degree-0.1:
                     if key in complement_rule_base:
                         complement_key = rule['consequent']
                         if complement_key in complement_rule_base[key]:
@@ -242,10 +245,11 @@ def ruleGeneration(x_data, x_ranges, y_data, y_range, model, injection_rule_base
                       num_epochs=num_epochs,
                       learning_rate=learning_rate,
                       batch_size=batch_size,
-                      rule_base=initial_rule_base)
+                      rule_base=initial_rule_base,
+                      progress=True)
     model_loss = anfis.getModelLoss(model, X, y)
     print("Initial model loss : {0}".format(model_loss))
-    altered_rule_base = initial_rule_base
+    altered_rule_base = initial_rule_base.copy()
     for key in altered_rule_base.keys():
         # if rule antecedent permutation is not in complement rb then continue
         if key not in complement_rule_base:
@@ -303,7 +307,7 @@ def ruleGeneration(x_data, x_ranges, y_data, y_range, model, injection_rule_base
             print("Reduced model loss : {0}".format(reduced_model_loss))
             model_loss = reduced_model_loss
 
-    altered_rule_base = rule_storage
+    altered_rule_base = rule_storage.copy()
 
     print("Rule base count after reduction : {0}".format(len(altered_rule_base)))
 
@@ -317,11 +321,70 @@ def ruleGeneration(x_data, x_ranges, y_data, y_range, model, injection_rule_base
     final_rule_base = altered_rule_base
     model.train_model(train_data=X,
                       train_labels=y,
-                      num_epochs=5,
+                      num_epochs=num_epochs,
                       learning_rate=learning_rate,
                       batch_size=batch_size,
-                      rule_base=final_rule_base)
+                      rule_base=final_rule_base,
+                      progress=True)
     final_loss = anfis.getModelLoss(model, X, y)
     print("Final model loss : {0}".format(final_loss))
 
     return model
+
+def printRule(rule):
+    antecedents = ["RSI ", "MACD ", "MACD Signal ", "Close ", "Stochastic Fast K ",
+                   "Stochastic Fast D ", "AROON Osc ", "Williams %R ", "Ultimate Oscilator ", "TSF ", "CCI "]
+    antecedentTerms = ["very low ", "low ", "middling ", "high ", "very high "]
+    consequentTerms = ["strong sell ", "sell ", "hold ", "buy ", "strong buy "]
+    equalTerm = "is "
+    connectiveTerm = "and "
+    initialTerm = "the "
+    resultingTerm = "indicating "
+
+    statement = ""
+    for idx, antecedentMF in enumerate(rule['antecedent']):
+        if antecedentMF == -1:
+            continue
+
+        statement += initialTerm + antecedents[idx] + equalTerm + antecedentTerms[antecedentMF] + connectiveTerm
+    statement = statement[:-4]
+    statement += resultingTerm + "a " + consequentTerms[rule['consequent']]
+    print(statement)
+
+def explainOutcome(rules, prediction):
+    antecedents = ["RSI ", "MACD ", "MACD Signal ", "Close ", "Stochastic Fast K ",
+                   "Stochastic Fast D ", "AROON Osc ", "Williams %R ", "Ultimate Oscilator ", "TSF ", "CCI "]
+    antecedentTerms = ["very low ", "low ", "middling ", "high ", "very high "]
+    consequentTerms = ["strong sell ", "sell ", "hold ", "buy ", "strong buy "]
+    equalTerm = "is "
+    connectiveTerm = "and "
+    initialTerm = "the "
+    resultingTerm = "indicating "
+
+    predictiveTerm = ""
+    if prediction >= -1.0 and prediction <= 1.0:
+        predictiveTerm = "hold "
+    elif prediction > 1.0 and prediction <= 2.5:
+        predictiveTerm = "buy "
+    elif prediction > 2.5:
+        predictiveTerm = "strong buy "
+    elif prediction < -1.0 and prediction >= -2.5:
+        predictiveTerm = "sell "
+    elif prediction < -2.5:
+        predictiveTerm = "strong sell "
+
+    predictiveStatement = ("The model has predicted a change of {0}% indicating a {1}, "
+                           "this can be derived from the following rules. ".format(prediction, predictiveTerm))
+
+    statement = ""
+    for rule in rules:
+        #print(rule)
+        for idx, antecedentMF in enumerate(rule['antecedent']):
+            if antecedentMF == -1:
+                continue
+
+            statement += initialTerm + antecedents[idx] + equalTerm + antecedentTerms[antecedentMF] + connectiveTerm
+        statement = statement[:-4]
+        statement += resultingTerm + "a " + consequentTerms[rule['consequent']] + ". "
+
+    print(predictiveStatement + statement)
