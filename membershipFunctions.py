@@ -6,7 +6,7 @@ import numpy as np
 from typing import List, Tuple
 
 class TrainableBellMF(nn.Module):
-    def __init__(self, initial_params):
+    def __init__(self, initial_params, name="null"):
         super().__init__()
 
         # Initialize parameters with small values to prevent explosion
@@ -14,17 +14,22 @@ class TrainableBellMF(nn.Module):
         self.b = nn.Parameter(torch.tensor([p[1] for p in initial_params], dtype=torch.float32))
         self.c = nn.Parameter(torch.tensor([p[2] for p in initial_params], dtype=torch.float32))
 
+        self.name = name
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if not isinstance(x, torch.Tensor):
             x = torch.tensor(x, dtype=torch.float32)
 
         membership_values = []
+        epsilon = 1e-4  # Small value to avoid division by zero
+
         for i in range(len(self.a)):
+            a_soft = torch.clamp(self.a[i], min=epsilon)  # Ensure `a_soft` is positive
+            b_soft = torch.clamp(self.b[i], min=epsilon)  # Ensure `b_soft` is positive
 
-            a_soft = self.a[i] + 1e-4
-            b_soft = self.b[i] + 1e-4
+            diff = (x - self.c[i]) / a_soft  # Avoid division by near-zero
+            diff = torch.clamp(diff, min=-1e6, max=1e6)  # Limit extreme values
 
-            diff = (x - self.c[i]) / a_soft
             membership_value = 1 / (1 + torch.pow(torch.abs(diff), 2 * b_soft))
 
             membership_values.append(membership_value)
@@ -43,6 +48,7 @@ class TrainableBellMF(nn.Module):
         membership_values = self.forward(x)
 
         plt.figure(figsize=(10, 6))
+        plt.title(self.name)
         for i, membership in enumerate(membership_values):
             plt.plot(x.numpy(), membership.detach().numpy(), label=f'Bell {i+1}')
 

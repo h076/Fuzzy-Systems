@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import math
 from functools import reduce
 from operator import mul
 import numpy as np
@@ -225,7 +225,7 @@ def getModelLoss(model, x_data: torch.Tensor, y_data: torch.Tensor):
     return torch.mean((y_data - predictions) ** 2).item()
 
 class MamdaniANFIS(nn.Module):
-    def __init__(self, input_mfs, output_mf, output_range, rule_base):
+    def __init__(self, input_mfs: nn.ModuleList, output_mf: nn.Module, output_range, rule_base):
         super().__init__()
         self.input_membership_functions = input_mfs
         self.output_membership_function = output_mf
@@ -241,12 +241,12 @@ class MamdaniANFIS(nn.Module):
 
     def explainPrediction(self, x_data: torch.Tensor, y_data: torch.Tensor):
         predictions = self.forward(x_data)
+        print(predictions)
         for idx, p in enumerate(predictions):
             print("predicted : {0}, True : {1}".format(p, y_data[idx]))
-            print("Rule firing ...")
             significant_rules = {}
             minimum_firing = 10000
-            print(len(self.rule_firing[idx]))
+
             for i, r in enumerate(self.rule_firing[idx]):
                 if len(significant_rules) == 8:
                     if minimum_firing < r:
@@ -257,14 +257,50 @@ class MamdaniANFIS(nn.Module):
                     significant_rules[r] = i
                     minimum_firing = min(minimum_firing, r)
 
-            print("Significant rules : ")
-            #for firing, index in significant_rules.items():
-                #print("Rule {0} fired at : {1}".format(index, firing))
-                #rg.printRule(self.rule_base[self.rule_firing_indices[index]])
             rules = []
             for firing, index in significant_rules.items():
+                print(index)
+                print(self.rule_firing_indices[index])
                 rules.append(self.rule_base[self.rule_firing_indices[index]])
             rg.explainOutcome(rules, p)
+
+    def getPredictions(self, x_data: torch.Tensor):
+        """
+        :param x_data: input data
+        :return: pred_firing_rule: list of tuples  [(prediction value, {
+                rule index: {
+                    antecedents: [int],
+                    consequent: int,
+                    firing strength: float})]
+        """
+        predictions = self.forward(x_data)
+        pred_firing_rule = []
+        for idx, p in enumerate(predictions):
+            significant_rules = {}
+            minimum_firing = 0.5
+
+            for rule_idx, firing_strength in enumerate(self.rule_firing[idx]):
+                if len(significant_rules) == 6:
+                    if minimum_firing < firing_strength:
+                        significant_rules.pop(minimum_firing)
+                        significant_rules[firing_strength] = rule_idx
+                        minimum_firing = min(significant_rules.keys())
+                else:
+                    significant_rules[firing_strength] = rule_idx
+                    minimum_firing = min(significant_rules.keys())
+
+            rules = {}
+            for firing, index in significant_rules.items():
+                rules[index] = {
+                    'antecedent': self.rule_base[self.rule_firing_indices[index]]['antecedent'],
+                    'consequent': self.rule_base[self.rule_firing_indices[index]]['consequent'],
+                    'firing': firing
+                }
+
+            pred_firing_rule.append((p, rules))
+
+        return pred_firing_rule
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch_size = x.shape[0]
@@ -273,6 +309,8 @@ class MamdaniANFIS(nn.Module):
         fuzzy_inputs = []
         for i, mf in enumerate(self.input_membership_functions):
             fuzzy_values = mf(x[:, i])
+            # Fix: Ensure no NaNs before clamping
+            fuzzy_values = torch.nan_to_num(fuzzy_values, nan=self.epsilon, posinf=1.0, neginf=0.0)
             fuzzy_values = torch.clamp(fuzzy_values, min=self.epsilon, max=1.0)
             fuzzy_inputs.append(fuzzy_values)
 
@@ -285,7 +323,8 @@ class MamdaniANFIS(nn.Module):
             firing_strength = torch.ones(batch_size, device=x.device)
             for input_idx, mf_idx in enumerate(mf_indices):
                 if mf_idx != -1:
-                    current_membership = fuzzy_inputs[input_idx][mf_idx]
+                    #current_membership = fuzzy_inputs[input_idx][mf_idx]
+                    current_membership = torch.clamp(fuzzy_inputs[input_idx][mf_idx], min=self.epsilon, max=1.0)
                     firing_strength *= current_membership  # Element-wise multiplication
 
             rule_firing_strengths.append(firing_strength)
@@ -306,6 +345,10 @@ class MamdaniANFIS(nn.Module):
             # get output membership function index
             mf_out_idx = rule['consequent']
 
+            # Fix: Check if mf_out_idx is within valid range
+            if mf_out_idx < 0 or mf_out_idx >= len(self.output_membership_function(output_universe)):
+                continue  # Skip invalid rules
+
             # shape : [num_points]
             output_memberships = self.output_membership_function(output_universe)[mf_out_idx]
 
@@ -324,6 +367,7 @@ class MamdaniANFIS(nn.Module):
         # Avoid division by zero by adding small epsilon
         numerator = torch.sum(output_universe * aggregated_output, dim=1)  # Shape: [batch_size]
         denominator = torch.sum(aggregated_output, dim=1) + self.epsilon  # Shape: [batch_size]
+
         crisp_output = numerator / denominator  # Shape: [batch_size]
 
         return crisp_output
@@ -366,13 +410,14 @@ class MamdaniANFIS(nn.Module):
 
                 if torch.isnan(loss):
                     print(f"NaN loss detected at epoch {epoch}, batch {batch}")
-                    return
+                    print(f"Outputs: {outputs}")
+                    return math.nan
 
                 loss.backward()
 
                 # Add both gradient clipping methods
-                torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0)
-                torch.nn.utils.clip_grad_value_(self.parameters(), clip_value=1.0) ###
+                torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=0.5)
+                torch.nn.utils.clip_grad_value_(self.parameters(), clip_value=0.5)
 
                 optimizer.step()
                 total_loss += loss.item()
