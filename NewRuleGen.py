@@ -28,16 +28,16 @@ def ruleGeneration(x_data, x_ranges, y_data, y_range, model, injection_rule_base
     X = torch.tensor(x_data, dtype=torch.float32)
     y = torch.tensor(y_data, dtype=torch.float32)
 
-    num_epochs = 100
-    learning_rate = 0.001
-    batch_size = 64
+    num_epochs = 50
+    learning_rate = 0.02
+    batch_size = 32
 
     num_input_mfs = 5
     num_output_mfs = 5
 
-    minimum_rule_degree = 0.75
+    minimum_rule_degree = 0.9
 
-    model_param_path = "temp_model_params.pth"
+    model_param_path = "temp_model_params_gen.pth"
 
     num_features = len(x_ranges)
 
@@ -89,7 +89,7 @@ def ruleGeneration(x_data, x_ranges, y_data, y_range, model, injection_rule_base
 
     # if two or more features are dependant then they should always be used together
     antecedent_permutations = []
-    dependant_feature_relations = []  # not zero indexed
+    dependant_feature_relations = [(3, 4)]  # not zero indexed
     for perm in permutation_storage:
         valid_perm = True
         for relation in dependant_feature_relations:
@@ -271,7 +271,7 @@ def ruleGeneration(x_data, x_ranges, y_data, y_range, model, injection_rule_base
 
             model.train_model(train_data=X,
                               train_labels=y,
-                              num_epochs=2,
+                              num_epochs=5,
                               learning_rate=learning_rate,
                               batch_size=batch_size,
                               rule_base=altered_rule_base)
@@ -299,7 +299,7 @@ def ruleGeneration(x_data, x_ranges, y_data, y_range, model, injection_rule_base
     # if the loss is decreased then it is permanently removed
     model.train_model(train_data=X,
                       train_labels=y,
-                      num_epochs=2,
+                      num_epochs=50,
                       learning_rate=learning_rate,
                       batch_size=batch_size,
                       rule_base=altered_rule_base)
@@ -318,7 +318,7 @@ def ruleGeneration(x_data, x_ranges, y_data, y_range, model, injection_rule_base
         rule_storage.pop(key)
         model.train_model(train_data=X,
                           train_labels=y,
-                          num_epochs=2,
+                          num_epochs=5,
                           learning_rate=learning_rate,
                           batch_size=batch_size,
                           rule_base=rule_storage)

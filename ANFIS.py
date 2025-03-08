@@ -218,11 +218,13 @@ class DeffuzificationLayer(nn.Module):
         return crisp_output
 """
 
+
 def getModelLoss(model, x_data: torch.Tensor, y_data: torch.Tensor):
     # Test predictions
     predictions = model(x_data).detach()
     # Calculate MSE using torch operations
     return torch.mean((y_data - predictions) ** 2).item()
+
 
 class MamdaniANFIS(nn.Module):
     def __init__(self, input_mfs: nn.ModuleList, output_mf: nn.Module, output_range, rule_base):
@@ -280,7 +282,7 @@ class MamdaniANFIS(nn.Module):
             minimum_firing = 0.5
 
             for rule_idx, firing_strength in enumerate(self.rule_firing[idx]):
-                if len(significant_rules) == 6:
+                if len(significant_rules) == 3:
                     if minimum_firing < firing_strength:
                         significant_rules.pop(minimum_firing)
                         significant_rules[firing_strength] = rule_idx
@@ -300,7 +302,6 @@ class MamdaniANFIS(nn.Module):
             pred_firing_rule.append((p, rules))
 
         return pred_firing_rule
-
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch_size = x.shape[0]
@@ -323,7 +324,7 @@ class MamdaniANFIS(nn.Module):
             firing_strength = torch.ones(batch_size, device=x.device)
             for input_idx, mf_idx in enumerate(mf_indices):
                 if mf_idx != -1:
-                    #current_membership = fuzzy_inputs[input_idx][mf_idx]
+                    # current_membership = fuzzy_inputs[input_idx][mf_idx]
                     current_membership = torch.clamp(fuzzy_inputs[input_idx][mf_idx], min=self.epsilon, max=1.0)
                     firing_strength *= current_membership  # Element-wise multiplication
 
@@ -361,7 +362,7 @@ class MamdaniANFIS(nn.Module):
 
         # Aggregation layer
         # use sum operator to sum all rule implications along all rule dimensions
-        aggregated_output = torch.sum(implications, dim=1) # Shape: [batch_size, num_points]
+        aggregated_output = torch.sum(implications, dim=1)  # Shape: [batch_size, num_points]
 
         # Defuzzification layer using center of mass
         # Avoid division by zero by adding small epsilon
@@ -427,3 +428,28 @@ class MamdaniANFIS(nn.Module):
 
             if epoch % progress_interval == 0 and progress:
                 print(f"Epoch {epoch}, Loss: {avg_loss:.4f}")
+
+    def evaluate_model(self, data: torch.Tensor, labels: torch.Tensor, batch_size: int = 32, rule_base: Dict = None):
+
+        if rule_base:
+            self.set_rule_base(rule_base)
+
+        criterion = nn.MSELoss()
+
+        total_loss = 0
+        num_batches = len(data) // batch_size
+
+        for batch in range(num_batches):
+            start_idx = batch * batch_size
+            end_idx = start_idx + batch_size
+
+            batch_data = data[start_idx:end_idx]
+            batch_labels = labels[start_idx:end_idx]
+
+            outputs = self(batch_data)
+
+            loss = criterion(outputs, batch_labels)
+
+            total_loss += loss.item()
+
+        return total_loss / num_batches

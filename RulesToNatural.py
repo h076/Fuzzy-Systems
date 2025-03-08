@@ -1,19 +1,22 @@
 import random
 
+import GenerativeResponse as gen
+
 class RulesToNatural:
     def __init__(self, predRange, antecedentLabels):
-        self.predictionRange = predRange
+        self.prediction_range = predRange
         self.antecedents = antecedentLabels
-        self.antecedentTerms = ["very low ", "low ", "middling ", "high ", "very high "]
-        self.consequentTerms = ["strong sell ", "sell ", "hold ", "buy ", "strong buy "]
-        self.equalTerms = ["is ", "shows to be ", "can be deduced as "]
-        self.connectiveTerms = ["and ", "furthermore ", "also "]
-        self.initialTerm = ["the "]
-        self.resultingTerms = ["indicating a ", "leading to a "]
+        self.antecedent_terms = ["very low ", "low ", "middling ", "high ", "very high "]
+        self.consequent_terms = ["strong sell ", "sell ", "hold ", "buy ", "strong buy "]
+        self.equal_terms = ["is ", "shows to be ", "can be deduced as "]
+        self.connective_terms = ["and ", "furthermore ", "also "]
+        self.initial_term = ["the "]
+        self.resulting_terms = ["indicating a ", "leading to a "]
+        self.rule_significance = ["very dominant ", "dominant ", "neutral dominance", "weak dominance", "very weak dominance"]
 
     def getPredictiveStatement(self, prediction):
-        min_range = self.predictionRange[0]
-        max_range = self.predictionRange[1]
+        min_range = self.prediction_range[0]
+        max_range = self.prediction_range[1]
 
         predictiveTerm = ""
 
@@ -37,16 +40,28 @@ class RulesToNatural:
         return words[random.randint(0, len(words)-1)];
 
     def getEqualTerm(self):
-        return self.getRand(self.equalTerms)
+        return self.getRand(self.equal_terms)
 
     def getConnectiveTerm(self):
-        return self.getRand(self.connectiveTerms)
+        return self.getRand(self.connective_terms)
 
     def getInitialTerm(self):
-        return self.getRand(self.initialTerm)
+        return self.getRand(self.initial_term)
 
     def getResultingTerm(self):
-        return self.getRand(self.resultingTerms)
+        return self.getRand(self.resulting_terms)
+
+    def getSignificance(self, firing):
+        if firing >= 0.8:
+            return self.rule_significance[0]
+        elif firing >= 0.6:
+            return self.rule_significance[1]
+        elif firing >= 0.4:
+            return self.rule_significance[2]
+        elif firing >= 0.2:
+            return self.rule_significance[3]
+        else:
+            return self.rule_significance[4]
 
     def explainPrediction(self, rules, prediction):
 
@@ -57,10 +72,13 @@ class RulesToNatural:
                 if antecedentMF == -1:
                     continue
 
-                statement += self.antecedents[idx] + self.getEqualTerm() + self.antecedentTerms[antecedentMF]
+                statement += self.antecedents[idx] + self.getEqualTerm() + self.antecedent_terms[antecedentMF]
                 if idx < len(rule['antecedent'])-1:
                     statement += self.getConnectiveTerm()
 
-            statement += self.getResultingTerm() + self.consequentTerms[rule['consequent']] + ". "
+            statement += self.getResultingTerm() + self.consequent_terms[rule['consequent']] + ". "
+            statement += "This rules firing strength suggest it was " + self.getSignificance(rule['firing'])
 
-        print(self.getPredictiveStatement(prediction) + statement + "\n")
+        response = self.getPredictiveStatement(prediction) + statement + "\n"
+
+        print(gen.cleanResponse(response))
