@@ -12,7 +12,7 @@ class RulesToNatural:
         self.connective_terms = ["and ", "furthermore ", "also "]
         self.initial_term = ["the "]
         self.resulting_terms = ["indicating a ", "leading to a "]
-        self.rule_significance = ["very dominant ", "dominant ", "neutral dominance", "weak dominance", "very weak dominance"]
+        self.rule_significance = ["very dominant ", "dominant ", "neutral dominance", "weak dominance", "very dominant"]
 
     def getPredictiveStatement(self, prediction):
         min_range = self.prediction_range[0]

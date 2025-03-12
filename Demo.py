@@ -34,6 +34,7 @@ def main():
     ranges = np.array((npSamples[0], npSamples[1])).T
     x_ranges = ranges[:-2]
     y_range: tuple[Any, Any] = (ranges[-2][0], ranges[-2][1])
+    print(y_range)
 
     x_data = npSamples[2:, :-2].astype(float)
     y_data = npSamples[2:, -2].astype(float)
