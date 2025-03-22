@@ -37,7 +37,7 @@ class RulesToNatural:
         return predictiveStatement
 
     def getRand(self, words):
-        return words[random.randint(0, len(words)-1)];
+        return words[random.randint(0, len(words)-1)]
 
     def getEqualTerm(self):
         return self.getRand(self.equal_terms)
@@ -81,4 +81,5 @@ class RulesToNatural:
 
         response = self.getPredictiveStatement(prediction) + statement + "\n"
 
+        print(response)
         print(gen.cleanResponse(response))

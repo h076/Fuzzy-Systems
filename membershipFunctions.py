@@ -99,7 +99,7 @@ class TrainableTrapezoidMF(nn.Module):
         return torch.stack(membership_values)
 
     def visualise(self, valueRange: Tuple[float, float]):
-        x = torch.linspace(valueRange[0], valueRange[1], 100)
+        x = torch.linspace(valueRange[0], valueRange[1], 1000)
         membership_values = self.forward(x)
 
         plt.figure(figsize=(10, 6))
@@ -125,5 +125,39 @@ def generateTrapezoidParams(numMfs: int, valueRange: Tuple[float, float]) -> Lis
         c = b + step   # End of plateau (third point)
         d = c + (step/2)    # End of ramp-down (rightmost point)
         params.append([a, b+1.8, c-1.8, d])
+
+    return params
+
+def generateOutputMFParams(valueRange: Tuple[float, float]) -> List[List[float]]:
+
+    minVal = valueRange[0]
+
+    params = []
+
+    # MF0
+    a = minVal  # Start of ramp-up (leftmost point)
+    b = minVal + 0.4  # Start of plateau (second point)
+    c = -1.2  # End of plateau (third point)
+    d = -0.8  # End of ramp-down (rightmost point)
+    params.append([a, b, c, d])
+
+    #MF 1 2 3
+    minVal = -1.0
+    maxVal = 1.0
+    step = (maxVal - minVal) / (4)
+    for i in range(3):
+        a = minVal + (step * i)  # Start of ramp-up (leftmost point)
+        b = a + (step / 2)  # Start of plateau (second point)
+        c = b + step  # End of plateau (third point)
+        d = c + (step / 2)  # End of ramp-down (rightmost point)
+        params.append([a, b, c, d])
+
+    #MF 4
+    maxVal = valueRange[1]
+    a = 0.8
+    b = 1.2
+    c = maxVal - 0.4
+    d = maxVal
+    params.append([a, b, c, d])
 
     return params

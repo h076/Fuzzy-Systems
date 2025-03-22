@@ -12,6 +12,8 @@ def evaluateMSE(model: nn.Module, x_data: torch.Tensor, y_data: torch.Tensor):
 
     print("model MSE : {0:.4f}".format(mse))
 
+    return mse
+
 def evaluateClassification(model: nn.Module, x_data: torch.Tensor, y_labels: [string], y_range: (float, float)):
     # Test predictions
     predictions = model(x_data).detach()

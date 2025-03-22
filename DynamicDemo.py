@@ -1,21 +1,5 @@
-from typing import Tuple, Any
-
-import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split
-
-import ANFIS as anfis
-import torch.nn as nn
-import torch
-import membershipFunctions as mf
-import NewRuleGen as rg
-
-import EvaluateModel as eval
-import RulesToNatural as nat
-import SaveAndLoad as snl
-
 """
-    - Load data
+    - Load data with labels
     - Initialise membership functions
     - visualise initial membership functions
     - generate rule base using data
@@ -26,8 +10,25 @@ import SaveAndLoad as snl
     - save model state
 """
 
+import numpy as np
+import pandas as pd
+from typing import Any
+
+import torch
+import torch.nn as nn
+from sklearn.model_selection import train_test_split
+
+import membershipFunctions as mf
+import ANFIS as anfis
+
+#import RuleGenDynamic as rgd
+import FinalRuleGen as frg
+import RulesToNatural as nat
+import EvaluateModel as eval
+import SaveAndLoad as snl
+
 def main():
-    dfSamples = pd.read_csv('Data/Samples.csv')
+    dfSamples = pd.read_csv("Data/Samples.csv")
     npSamples = dfSamples.to_numpy()
 
     ranges = np.array((npSamples[0], npSamples[1])).T
@@ -48,20 +49,18 @@ def main():
         imf.visualise((min_val, max_val))
         input_mfs.append(imf)
 
-    params = mf.generateTrapezoidParams(5, y_range)
+    params = mf.generateOutputMFParams(y_range)
     output_mf = mf.TrainableTrapezoidMF(params)
     output_mf.visualise(y_range)
 
     model = anfis.MamdaniANFIS(input_mfs, output_mf, y_range, {})
 
-    #X_train, X_test, y_train, y_test = train_test_split(x_data, y_data, test_size=0.2, random_state=42)
-
-    X_train, X_test, y_train_values, y_test_data, y_train_labels, y_test_labels = train_test_split(
-        x_data, y_data, y_labels, test_size=0.1, random_state=42
+    X_train, X_test, y_train_data, y_test_data, y_train_labels, y_test_labels = train_test_split(
+        x_data, y_data, y_labels, test_size=0.2, random_state=42
     )
 
     # generate rule base and train model
-    model = rg.ruleGeneration(X_train, x_ranges, y_train_values, y_range, model, {})
+    model = frg.ruleGeneration(X_train, x_ranges, y_train_data, y_range, model, {})
 
     # visualise final membership functions
     for (min_val, max_val), input_mf in zip(x_ranges, input_mfs):
