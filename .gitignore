@@ -11,3 +11,5 @@ pyrightconfig.json
 .idea
 __pycache__
 fuzzy systems
+APIKeys/
+*.pth
